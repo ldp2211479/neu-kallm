@@ -1,22 +1,24 @@
 from utils.retrieval.wikidata import retrieve_wikidata_knowledge
 from utils.retrieval.wikipedia import retrieve_wikipedia_knowledge
 
-# domain and knowledge sources mapping
+#  knowledge sources mapping
 domain_mapping = {
     "wikidata": retrieve_wikidata_knowledge,
     # "wikitable": retrieve_wikitable_knowledge,
-    # "dpr": retrieve_dpr_knowledge,
     "wikipedia": retrieve_wikipedia_knowledge
 }
 
 
-def retrieve_knowledge(input, data_point):
+def retrieve_knowledge(query, constraint):
     # input is a string
     knowl = {}
+    knowl_wikipedia_list = []
     for source in domain_mapping:
         print("--- Retrieving knowledge from", source)
-        tmp_knowl = domain_mapping[source](input, data_point)
-        # print(tmp_knowl)
+        if 'wikidata' in source:
+            tmp_knowl = domain_mapping[source](query)
+        elif 'wikipedia' in source:
+            tmp_knowl = domain_mapping[source](query, constraint)
         knowl[source] = tmp_knowl
     return knowl
 

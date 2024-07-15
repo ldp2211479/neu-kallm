@@ -1,0 +1,13 @@
+bitarray
+sacrebleu
+ninja
+ujson
+bs4
+boto3
+Flask_Limiter
+pymongo
+python-dateutil
+text-generation==0.6.0
+together>=0.2.6
+pygments
+pyyaml

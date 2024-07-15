@@ -1,7 +1,13 @@
 export TRANSFORMERS_VERBOSITY=error
-export CUDA_VISIBLE_DEVICES=0
-# python run.py \
-#     --model gpt-3.5-turbo-0613 \
-#     --dataset hotpotqa \
-#     --output outputs/hotpotqa/hotpotqa_output.json \
-#     --step True \
+# export OPENAI_API_KEY=YOUR_KEY
+export CUDA_VISIBLE_DEVICES=1,2
+BASE_OUTPUT_PATH="outputs_sigangluo"
+DATASET="tiq"
+TYPE="test"
+MODEL="llama3:70b"
+
+python run.py \
+    --model ${MODEL} \
+    --dataset ${DATASET} \
+    --input datasets/${DATASET}/${TYPE}.json \
+    --output ${BASE_OUTPUT_PATH}/${DATASET}/${TYPE}_out.json

@@ -13,7 +13,7 @@ from transformers import (
     PreTrainedModel,
     PreTrainedTokenizer,
 )
-
+# import utils.globalvar
 
 Span = Tuple[int, int]
 
@@ -181,7 +181,6 @@ class SpacyEntityDetector(EntityDetector, arbitrary_types_allowed=True):
             self.model = spacy.load(self.model_name)
 
     def run(self, text: str) -> List[Span]:
-        self.load()
         doc = self.model(text)
 
         outputs = []
@@ -226,9 +225,10 @@ class EntityLinker(BaseModel):
 class GenreEntityLinker(EntityLinker, arbitrary_types_allowed=True):
     """https://huggingface.co/facebook/mgenre-wiki"""
 
-    model_name: str = "facebook/mgenre-wiki"  # Multilingual
+    # model_name: str = "facebook/mgenre-wiki"  # Multilingual
+    model_name: str = "./model/mgenre-wiki"
     # model_name: str = "facebook/genre-linking-blink"  # English
-    path_title_map: str = "utils/retrieval/linking_data/genre/title_to_id_en.pkl"
+    path_title_map: str = "./utils/retrieval/linking_data/genre/title_to_id_en.pkl"
     title_id_map: Optional[Dict[str, str]] = None
     model: Optional[PreTrainedModel] = None
     tokenizer: Optional[PreTrainedTokenizer] = None
@@ -254,7 +254,6 @@ class GenreEntityLinker(EntityLinker, arbitrary_types_allowed=True):
         self.load_model()
 
     def run(self, text: str, span: Span) -> List[str]:
-        self.load()
         mention = text[slice(*span)]
         parts = [text[: span[0]], "[START]", mention, "[END]"]
         x = " ".join(parts)
@@ -278,30 +277,53 @@ class GenreEntityLinker(EntityLinker, arbitrary_types_allowed=True):
         return outputs
 
 
-def test_linking(
-    text: str = "Einstein was a German-born theoretical physicist.",
-    # text: str = "Einstein era un fisico tedesco.",
-):
-    detector = SpacyEntityDetector()
-    linker = GenreEntityLinker()
+# def test_linking(
+#     text: str = "Einstein was a German-born theoretical physicist.",
+#     # text: str = "Einstein era un fisico tedesco.",
+# ):
+#     if utils.globalvar.model_spacy_EntityDetector is not None:
+#         detector = utils.globalvar.model_spacy_EntityDetector
+#     else:
+#         detector = SpacyEntityDetector()
+#         detector.load()
+#     if utils.globalvar.model_genre_EntityDetector is not None:
+#         linker = utils.globalvar.model_genre_EntityDetector
+#     else:
+#         linker = GenreEntityLinker()
+#         linker.load()
+    
+#     opt = []
+#     for span in detector.run(text):
+#         links = linker.run(text, span=span)
+#         # print(dict(char_span=span, mention=text[slice(*span)], links=links))
+#         opt.append(dict(char_span=span, mention=text[slice(*span)], links=links))
 
-    opt = []
-    for span in detector.run(text):
-        links = linker.run(text, span=span)
-        # print(dict(char_span=span, mention=text[slice(*span)], links=links))
-        opt.append(dict(char_span=span, mention=text[slice(*span)], links=links))
+#     return opt
 
-    return opt
+#     """
+#     {'char_span': (0, 8), 'mention': 'Einstein', 'links': ['Q937']}
+#     {'char_span': (15, 21), 'mention': 'German', 'links': ['Q42884', 'Q183', 'Q22633', 'Q43287', 'Q188']}
+#     """
 
-    """
-    {'char_span': (0, 8), 'mention': 'Einstein', 'links': ['Q937']}
-    {'char_span': (15, 21), 'mention': 'German', 'links': ['Q42884', 'Q183', 'Q22633', 'Q43287', 'Q188']}
-    """
+def test_linking(text: str):
+    if utils.globalvar.model_genre_EntityDetector is not None:
+        linker = utils.globalvar.model_genre_EntityDetector
+    else:
+        linker = GenreEntityLinker()
+        linker.load()
+        utils.globalvar.model_genre_EntityDetector = linker
+    
+    span = [0, len(text)]
+    links = linker.run(text, span=span)
+    # print(text, "(the linking:", links[:3], ")")
+    return links
+
+
 
 
 def process_titles(
-    path_in: str = "utils/retrieval/linking_data/genre/lang_title2wikidataID-normalized_with_redirect.pkl",
-    path_out="utils/retrieval/linking_data/genre/title_to_id_en.pkl",
+    path_in: str = "./utils/retrieval/linking_data/genre/lang_title2wikidataID-normalized_with_redirect.pkl",
+    path_out="./utils/retrieval/linking_data/genre/id_to_title_en.pkl",
     languages: List[str] = ("en",),
 ):
     for _ in tqdm(range(1), desc=path_in):
@@ -310,16 +332,27 @@ def process_titles(
             raw: Dict[Tuple[str, str], Set[str]] = pickle.load(f)
 
     mapping: Dict[str, List[str]] = {}
+    # for k, v in tqdm(raw.items()):
+    #     if k[0] in languages:
+    #         k_new = k[1] + " >> " + k[0]  # Match model output format
+    #         v_new = sorted(v)[0]  # Str instead of list for speed
+    #         mapping[k_new] = v_new  # TODO: Disambiguate the v
+
+    # for _ in tqdm(range(1), desc=path_out):
+    #     with open(path_out, "wb") as f:
+    #         pickle.dump(mapping, f)
     for k, v in tqdm(raw.items()):
         if k[0] in languages:
-            k_new = k[1] + " >> " + k[0]  # Match model output format
+            k_new = k[1]          # Match model output format
             v_new = sorted(v)[0]  # Str instead of list for speed
-            mapping[k_new] = v_new  # TODO: Disambiguate the v
+            mapping[v_new] = k_new  # TODO: Disambiguate the v
 
     for _ in tqdm(range(1), desc=path_out):
         with open(path_out, "wb") as f:
             pickle.dump(mapping, f)
-
+    pass
 
 if __name__ == "__main__":
     Fire()
+# if __name__ == "__main__":
+#     process_titles()

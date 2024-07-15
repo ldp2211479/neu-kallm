@@ -3,96 +3,34 @@ import json
 from pathlib import Path
 
 from tqdm import tqdm
-from utils.openai_utils import call_openai_api
-from utils.other_prompts import domain_selection_demonstration
 
 # init gloabl variables
-import utils.globalvar
-utils.globalvar.init()
+# import utils.globalvar
+# utils.globalvar.init()
 
 import os
+os.environ["OPENAI_API_KEY"] = ''
+# os.environ["SERPAPI_KEY"] = '07083bd236bdb1ed80fa702bffce819b0552b27d3e367461493edc10aac82443'
 
 
-def s1_reasoning_preparation(dataset, data_point, model, threshold):
-    print("****************** Start stage 1: reasoning preparation ...")
-    question = dataset.get_question(data_point)
-    print("****** Question:", question)
-
-    ### Domain selection
-    domain_selection_prompt = domain_selection_demonstration + "Q: " + question.strip() + "\nRelevant domains: "
-    domain_selection_response = call_openai_api(model, domain_selection_prompt, max_tokens=256, temperature=0)
-    
-    if domain_selection_response is not None:
-        domain_selection_text_response = domain_selection_response[1].strip()
-        print("****** Relevant domains:", domain_selection_text_response)
-        data_point["s1_domains"] = [x.strip() for x in domain_selection_text_response.split(",")]
-    
-    ### CoT generation
-    cot_prompt = dataset.get_s1_prompt(question)
-    
-    data_point = dataset.get_cot_sc_results(data_point, model, cot_prompt)
-    print("****** CoT answer:", data_point["cot_response"])
-    print("****** CoT SC score:", data_point["cot_sc_score"])
-    print("****** CoT SC answer:", data_point["cot_sc_response"])
-
-    return data_point
-
-
-def s2_knowledge_adapting(dataset, data_point, model, step):
-    print("****************** Start stage 2: knowledge adapting ...")
-    if step:
-        print("****** Edit mode: Step by step")
-        # Edit the rationales step by step
-        data_point = dataset.update_rationales_step_by_step(model, data_point)
-
-    else:
-        # Edit the rationales all at once
-        print("****** Edit mode: At once")
-        # Edit the rationales step by step
-        data_point = dataset.update_rationales_at_once(model, data_point)
-
-    return data_point
-
-def s3_answer_consolidation(dataset, data_point, model):
-    print("****************** Start stage 3: answer consolidation ...")
-    data_point = dataset.get_final_answer(model, data_point)
-    return data_point
-
-
+# python run.py --model llama3:70b --dataset --input --output 
 if __name__ == "__main__":
     # read arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", type=str, default="gpt-3.5-turbo-0613", help="OpenAI API model name")
-    parser.add_argument("--dataset", type=str, help="Dataset name")
+    parser.add_argument("--model", type=str, default="gpt-3.5-turbo-0613", help="Base model name(gpt-/text-davinci/llama)")
+    parser.add_argument("--dataset", type=str, help="Dataset name(tiq/timequestions)")
+    parser.add_argument("--input", type=str, help="Input path")
     parser.add_argument("--output", type=str, help="Output path")
-    parser.add_argument("--step", type=bool, default=False, help="Whether to edit the rationales step by step")
-    parser.add_argument("--num_train", type=int, default=3, help="How many demonstration samples to use")
-    parser.add_argument("--num_test", type=int, default=5, help="How many test samples to use")
-    parser.add_argument("--threshold", type=float, default=0.5, help="sc threshold for ka answer")
-    parser.add_argument("--one_shot", action="store_true", help="Whether to use 1-shot setting")
-    parser.add_argument("--six_shot", action="store_true", help="Whether to use 6-shot setting")
 
     args = parser.parse_args()
     
     # TODO: add other datasets, as well as a parser for each dataset
-    if args.dataset == "hotpotqa":
-        from utils.hotpotqa_parser import hotpotqa
-        dataset = hotpotqa()
-    elif args.dataset == "medmcqa":
-        from utils.medmcqa_parser import medmcqa
-        dataset = medmcqa()
-    elif args.dataset == "mmluphy":
-        from utils.phy_parser import phy
-        dataset = phy()
-    elif args.dataset == "mmlubio":
-        from utils.bio_parser import bio
-        dataset = bio()
-    elif args.dataset == "fever":
-        from utils.fever_parser import fever
-        dataset = fever(six_shot=args.six_shot, one_shot=args.one_shot)
-    elif "feta" in args.dataset:
-        from utils.fetaqa_parser import select_fetaqa_dataset
-        dataset = select_fetaqa_dataset(args.dataset, num_train=args.num_train)
+    if args.dataset == "tiq":
+        from utils.parser.tiq_parser import tiq
+        dataset = tiq(args.input)
+    elif args.dataset == "timequestions":
+        from utils.parser.timequestions_parser import timequestions
+        dataset = timequestions(args.input)
     else:
         raise Exception("Invalid dataset name")
 
@@ -100,6 +38,7 @@ if __name__ == "__main__":
     Path(args.output).parent.mkdir(exist_ok=True, parents=True)
     data = dataset.get_dataset()
     print('original data length:', len(data))
+    #下面这段代码主要防止运行时中断，可以在断点重新运行
     if os.path.exists(args.output):
         print('Found existing outputs, will replace the original data with the existing outputs')
         # read existing outputs
@@ -114,64 +53,50 @@ if __name__ == "__main__":
                     replace_count += 1
                     break
         print('replaced {} existing outputs'.format(replace_count))
-        print('Found {} prepared outputs.'.format(len([x["id"] for x in data if 'cot_answer' in x])))
-        print('Found {} outputs that need to be edited.'.format(len([x["id"] for x in data if 'cot_answer' in x and x["cot_sc_score"] < args.threshold and 'final_answer' not in x])))
-        print('Found {} edited outputs.'.format(len([x["id"] for x in data if 'final_answer' in x])))
+        print('Found {} prepared outputs.'.format(len([x["id"] for x in data if 'cot_answer' in x])))#cot的结果
+        print('Found {} edited outputs.'.format(len([x["id"] for x in data if 'final_answer' in x])))#cot修正后的结果
         
-    count = 0
-    for i in tqdm(range(min(args.num_test, len(data)))):
-        print("####################################", i, "####################################")
-        data_point = data[i]
-        data_point["id"] = i
 
-        if args.dataset == "fetaqa" or args.dataset == "fetaqa_query":
-            question = data_point["question"]
-            cot_prompt = dataset.get_s1_prompt(question)
-            data_point = dataset.get_cot_sc_results(data_point, args.model, cot_prompt)
-            print("****** CoT answer:", data_point["cot_response"])
-            print("****** CoT SC score:", data_point["cot_sc_score"])
-            print("****** CoT SC answer:", data_point["cot_sc_response"])
-            data[i] = data_point
-            with open(args.output, "w") as f:
-                json.dump(data, f)
-            continue
+    for i in tqdm(range(len(data))):
+        data_point = data[i]
+        print("####################################", data_point["id"], "####################################")
         
         # add filtering to ensure we have not previously produced the results
-        if 'cot_sc_score' not in data_point:
-            ##### run stage 1: reasoning preparation
-            data_point = s1_reasoning_preparation(dataset, data_point, args.model, args.threshold)
-            
-            # update the datapoint
+        if 'cot_answer' not in data_point:
+            print("****************** Start stage 1: 先让大模型自己回答一遍 ...")
+            print("****** question:\n", dataset.get_question(data_point))
+            dataset.get_cot_results(data_point, args.model)
+            print("****** CoT answer:\n", data_point["cot_response"])
             data[i] = data_point
-            
             with open(args.output, "w") as f:
                 json.dump(data, f)
-    
-        # Self-consistency threshold
-        if data_point["cot_sc_score"] < args.threshold and 'final_answer' not in data_point:
-            # continue only when the score is lower than threshold
-            ##### run stage 2: knowledge adapting
-            data_point = s2_knowledge_adapting(dataset, data_point, args.model, args.step)
-
-            # update the datapoint
+        if 'knowl_list' not in data_point:
+            dataset.retrieve_once(data_point)
             data[i] = data_point
-
             with open(args.output, "w") as f:
                 json.dump(data, f)
+        
+        # if 'final_answer' not in data_point:
+            ##### run stage 2: 对于timequestion 直接基于检索到的依据和原来的回答 给出新的回答 new reason和new answer
+        dataset.get_final_results(data_point,"Q_1",args.model)
+        print("****** Final respond:\n", data_point["correct_qa1_respond"])
+        data[i] = data_point
+        with open(args.output, "w") as f:
+            json.dump(data, f)
+        #     elif args.dataset == "tiq":
+        #         data_point = dataset.get_final_results(data_point,"question",args.model)
+        #         data[i] = data_point
+        #         with open(args.output, "w") as f:
+        #             json.dump(data, f)
 
-            ##### run stage 3: answer consolidation
-            data_point = s3_answer_consolidation(dataset, data_point, args.model)
+            # ##### run stage 3: answer consolidation
+            # data_point = s3_answer_consolidation(dataset, data_point, args.model)
 
-            # update the datapoint
-            data[i] = data_point
+            # # update the datapoint
+            # data[i] = data_point
 
-            with open(args.output, "w") as f:
-                json.dump(data, f)
-        else:
-            count += 1
-            continue
+            # with open(args.output, "w") as f:
+            #     json.dump(data, f)
 
-
-    print("Number of skipped samples (high consistency): ", count)
     print("ALL DONE!!")
 
