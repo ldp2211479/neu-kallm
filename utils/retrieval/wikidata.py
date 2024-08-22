@@ -320,8 +320,9 @@ def server_retrieve(
     if response.status_code != 200:
         raise Exception("Retrieval Wikidata Search API Error: %s" % str(response))
     results = response.json()
-    prediction_results, sparql = results
-    return prediction_results, sparql
+    knowl = results['knowl']
+    sparql = results['sparql']
+    return knowl, sparql
 
 
 

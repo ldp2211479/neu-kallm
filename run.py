@@ -78,11 +78,11 @@ if __name__ == "__main__":
         
         # if 'final_answer' not in data_point:
             ##### run stage 2: 对于timequestion 直接基于检索到的依据和原来的回答 给出新的回答 new reason和new answer
-        dataset.get_final_results(data_point,"Q_1",args.model)
-        print("****** Final respond:\n", data_point["correct_qa1_respond"])
-        data[i] = data_point
-        with open(args.output, "w") as f:
-            json.dump(data, f)
+        # dataset.get_final_results(data_point,"Q_1",args.model)
+        # print("****** Final respond:\n", data_point["correct_qa1_respond"])
+        # data[i] = data_point
+        # with open(args.output, "w") as f:
+        #     json.dump(data, f)
         #     elif args.dataset == "tiq":
         #         data_point = dataset.get_final_results(data_point,"question",args.model)
         #         data[i] = data_point

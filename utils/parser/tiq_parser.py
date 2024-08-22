@@ -163,22 +163,17 @@ class tiq:
             print(correct_1_response[0])
             if correct_1_response is not None:
                 correct_1_text_response = correct_1_response[1]
-                if "New answer:" in correct_1_text_response:
-                    correct_1_answer = correct_1_text_response.split("New answer:")[1].strip().lower()
-                else:
-                    raise Exception("Stage 1: Incorrect answer format")
                 patterns = {
-                            "Explanation": r"Explanation: (.*?)\n"
+                    "New Answer": r"New answer: (.*?)\n",
+                    "Explanation": r"Explanation: (.*?)\n"
                 }
-
                 results = {}
-                results["Explanation"] = correct_1_text_response.split("New answer:")[0]
-                # for key in patterns.keys():
-                #     match = re.search(patterns[key], correct_1_text_response, re.DOTALL)
-                #     if match:
-                #         results[key] = match.group(1).strip()
-                #     else:
-                #         raise Exception("Stage 1: Incorrect answer format")
+                for key in patterns.keys():
+                    match = re.search(patterns[key], correct_1_text_response, re.DOTALL)
+                    if match:
+                        results[key] = match.group(1).strip()
+                    else:
+                        raise Exception("Stage 1: Incorrect answer format")
             else:
                 raise Exception("Stage 1: language model API call failed")
         except Exception as e:
@@ -197,7 +192,7 @@ class tiq:
         data_point["correct_qa1_explanation"] = results["Explanation"]
         data_point["correct_qa1"] = {
             "q":data_point["cot_qa1"]["q"],
-            "a":correct_1_answer
+            "a":results["New Answer"]
         }
         
         return data_point

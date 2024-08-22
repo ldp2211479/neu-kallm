@@ -1,0 +1,1 @@
+from .wikidata import wikidata_load, execute_wikidata_query

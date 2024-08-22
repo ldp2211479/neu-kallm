@@ -1,9 +1,9 @@
 export TRANSFORMERS_VERBOSITY=error
 # export OPENAI_API_KEY=YOUR_KEY
 export CUDA_VISIBLE_DEVICES=1,2
-BASE_OUTPUT_PATH="outputs_sigangluo"
-DATASET="tiq"
-TYPE="test"
+BASE_OUTPUT_PATH="outputs_sigangluo2"
+DATASET="timequestions"
+TYPE="train_sample"
 MODEL="llama3:70b"
 
 python run.py \
